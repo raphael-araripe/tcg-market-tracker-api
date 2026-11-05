@@ -1,0 +1,28 @@
+-- Seed initial 25 Yu-Gi-Oh! cards from legacy Python watchlist
+INSERT INTO watched_cards (blueprint_id, card_name, target_language, target_condition) VALUES
+    (245836, 'Blue-Eyes White Dragon', 'en', 'Near Mint'),
+    (328622, 'Dragon Master Magia', 'en', 'Near Mint'),
+    (300540, 'Cosmic Blazar Dragon', 'en', 'Near Mint'),
+    (348607, 'Spirit with Eyes of Blue', 'en', 'Near Mint'),
+    (338404, 'Kaibaman the Legend', 'en', 'Near Mint'),
+    (302314, 'S:P Little Knight', 'en', 'Near Mint'),
+    (69917,  'Stardust Sifr Divine Dragon', 'en', 'Near Mint'),
+    (328733, 'Super Starslayer TY-PHON', 'en', 'Near Mint'),
+    (348653, 'Dominus Purge', 'en', 'Near Mint'),
+    (336256, 'Primite Dragon Ether Beryl', 'en', 'Near Mint'),
+    (348672, 'Primite Lordly Lode', 'en', 'Near Mint'),
+    (355051, 'Mulcharmy Purulia', 'en', 'Near Mint'),
+    (355131, 'Mulcharmy Fuwalos', 'en', 'Near Mint'),
+    (355091, 'Mulcharmy Meowls', 'en', 'Near Mint'),
+    (354134, 'Triple Tactics Thrust', 'en', 'Near Mint'),
+    (254127, 'Red-Eyes Black Meteor Dragon', 'en', 'Near Mint'),
+    (83478,  'Meteor Black Comet Dragon', 'en', 'Near Mint'),
+    (298234, 'Chaos Angel', 'en', 'Near Mint'),
+    (338420, 'Secreterion Dragon', 'en', 'Near Mint'),
+    (287592, 'Bingo Machine, Go!!!', 'en', 'Near Mint'),
+    (368496, 'Fallen of the White Dragon', 'en', 'Near Mint'),
+    (368497, 'Fallen of the White Dragon', 'en', 'Near Mint'),
+    (368521, 'Ecclesia and the Dark Dragon', 'en', 'Near Mint'),
+    (368522, 'Ecclesia and the Dark Dragon', 'en', 'Near Mint'),
+    (288324, 'Hieratic Seal of the Heavenly Spheres', 'en', 'Near Mint')
+ON CONFLICT (blueprint_id) DO NOTHING;
