@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TCG Market Tracker & Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans">
+
+    <!-- Top Navbar -->
+    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-10">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex flex-wrap justify-between items-center gap-4">
+            <div>
+                <h1 class="text-xl font-bold text-white flex items-center gap-2">
+                    🃏 TCG Market Tracker <span class="text-xs bg-indigo-600/30 text-indigo-300 border border-indigo-500/40 px-2.5 py-0.5 rounded-full">Java 21 + Spring Boot</span>
+                </h1>
+                <p class="text-xs text-slate-400 mt-0.5">Real-time CardTrader API v2 Near Mint (EN) Price Intelligence</p>
+            </div>
+
+            <div class="flex items-center gap-3">
+                <button onclick="loadAnalytics()" class="px-3.5 py-2 text-sm bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg border border-slate-700 transition">
+                    ↻ Refresh Table
+                </button>
+                <button id="syncBtn" onclick="triggerMarketSync()" class="px-4 py-2 text-sm font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg shadow-indigo-600/20 transition flex items-center gap-2">
+                    ⚡ Sync Market Prices Now
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-6 py-8 space-y-6">
+
+        <!-- Status Banner -->
+        <div id="statusAlert" class="hidden p-4 rounded-xl border text-sm"></div>
+
+        <!-- KPI Summary Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Monitored Cards</span>
+                <p id="kpiTotalCards" class="text-2xl font-bold text-white mt-1">-</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Price Drop Alerts</span>
+                <p id="kpiDrops" class="text-2xl font-bold text-emerald-400 mt-1">-</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Price Spikes</span>
+                <p id="kpiSpikes" class="text-2xl font-bold text-rose-400 mt-1">-</p>
+            </div>
+            <div class="bg-slate-900 border border-slate-800 p-5 rounded-xl">
+                <span class="text-xs text-slate-400 uppercase tracking-wider">Add to Watchlist</span>
+                <form onsubmit="addNewCard(event)" class="mt-2 flex gap-2">
+                    <input id="inputBlueprintId" type="number" required placeholder="ID (e.g. 302314)" class="w-1/3 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <input id="inputCardName" type="text" required placeholder="Card Name" class="w-1/2 bg-slate-950 border border-slate-800 rounded px-2 py-1 text-xs focus:outline-none focus:border-indigo-500">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-500 text-white px-2.5 py-1 rounded text-xs font-bold">+</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Search & Filter Bar -->
+        <div class="flex justify-between items-center gap-4">
+            <input id="searchInput" oninput="filterTable()" type="text" placeholder="Search by card name, rarity, or expansion..."
+                   class="w-full max-w-md bg-slate-900 border border-slate-800 rounded-lg px-4 py-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+            <span id="lastUpdatedLabel" class="text-xs text-slate-500"></span>
+        </div>
+
+        <!-- Analytics Data Table -->
+        <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-xl">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-slate-800 bg-slate-950/60 text-xs uppercase text-slate-400">
+                            <th class="py-3.5 px-4">Card & Expansion</th>
+                            <th class="py-3.5 px-3">Rarity</th>
+                            <th class="py-3.5 px-3">Cond</th>
+                            <th class="py-3.5 px-3 text-right">Start</th>
+                            <th class="py-3.5 px-3 text-right">Prev</th>
+                            <th class="py-3.5 px-3 text-right text-indigo-300">Current (R$)</th>
+                            <th class="py-3.5 px-3 text-right">7d Avg (Var %)</th>
+                            <th class="py-3.5 px-3 text-right">30d Avg (Var %)</th>
+                            <th class="py-3.5 px-3 text-center">Liquidity</th>
+                            <th class="py-3.5 px-4 text-center">Trend</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analyticsTableBody" class="divide-y divide-slate-800/70 text-sm">
+                        <tr>
+                            <td colspan="10" class="py-8 text-center text-slate-500">Loading market analytics...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let allCardsData = [];
+
+        async function loadAnalytics() {
+            try {
+                const response = await fetch('/api/v1/analytics/summary');
+                allCardsData = await response.json();
+                renderTable(allCardsData);
+                updateKPIs(allCardsData);
+            } catch (err) {
+                showStatus('Failed to load analytics data: ' + err.message, true);
+            }
+        }
+
+        function renderTable(cards) {
+            const tbody = document.getElementById('analyticsTableBody');
+            if (!cards || cards.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="10" class="py-8 text-center text-slate-400">No snapshots recorded yet. Click <b>"Sync Market Prices Now"</b> on the top right!</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = cards.map(c => `
+                <tr class="hover:bg-slate-800/50 transition">
+                    <td class="py-3 px-4">
+                        <div class="font-semibold text-white">${c.cardName}</div>
+                        <div class="text-xs text-slate-400">${c.expansionName || 'Pending enrichment'} <span class="text-slate-600">#${c.blueprintId}</span></div>
+                    </td>
+                    <td class="py-3 px-3 text-xs text-slate-300">${c.rarity || '-'}</td>
+                    <td class="py-3 px-3"><span class="px-2 py-0.5 text-xs rounded bg-slate-800 text-slate-300 border border-slate-700">${c.conditionDisplay}</span></td>
+                    <td class="py-3 px-3 text-right text-slate-400">R$ ${Number(c.initialPrice).toFixed(2)}</td>
+                    <td class="py-3 px-3 text-right text-slate-400">R$ ${Number(c.previousPrice).toFixed(2)}</td>
+                    <td class="py-3 px-3 text-right font-bold text-white">R$ ${Number(c.currentPrice).toFixed(2)}</td>
+                    <td class="py-3 px-3 text-right">
+                        <div class="text-slate-200">R$ ${Number(c.avgPrice7d).toFixed(2)}</div>
+                        <div class="text-xs ${formatVarColor(c.varFrom7dAvgPct)}">${formatPct(c.varFrom7dAvgPct)}</div>
+                    </td>
+                    <td class="py-3 px-3 text-right">
+                        <div class="text-slate-200">R$ ${Number(c.avgPrice30d).toFixed(2)}</div>
+                        <div class="text-xs ${formatVarColor(c.varFrom30dAvgPct)}">${formatPct(c.varFrom30dAvgPct)}</div>
+                    </td>
+                    <td class="py-3 px-3 text-center text-xs text-slate-300">${c.validListingsCount} listings</td>
+                    <td class="py-3 px-4 text-center">${renderTrendBadge(c.marketTrend)}</td>
+                </tr>
+            `).join('');
+        }
+
+        function updateKPIs(cards) {
+            document.getElementById('kpiTotalCards').textContent = cards.length;
+            document.getElementById('kpiDrops').textContent = cards.filter(c => c.marketTrend === 'PRICE_DROP_ALERT').length;
+            document.getElementById('kpiSpikes').textContent = cards.filter(c => c.marketTrend === 'PRICE_SPIKE').length;
+            if (cards.length > 0 && cards[0].lastUpdated) {
+                document.getElementById('lastUpdatedLabel').textContent = 'Last Sync: ' + new Date(cards[0].lastUpdated).toLocaleString();
+            }
+        }
+
+        function formatPct(val) {
+            const num = Number(val);
+            return (num > 0 ? '+' : '') + num.toFixed(2) + '%';
+        }
+
+        function formatVarColor(val) {
+            const num = Number(val);
+            if (num < 0) return 'text-emerald-400 font-medium';
+            if (num > 0) return 'text-rose-400 font-medium';
+            return 'text-slate-500';
+        }
+
+        function renderTrendBadge(trend) {
+            if (trend === 'PRICE_DROP_ALERT') {
+                return `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🚨 DROP</span>`;
+            }
+            if (trend === 'PRICE_SPIKE') {
+                return `<span class="px-2.5 py-1 text-xs font-semibold rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">📈 SPIKE</span>`;
+            }
+            return `<span class="px-2.5 py-1 text-xs rounded-full bg-slate-800 text-slate-400">STABLE</span>`;
+        }
+
+        async function triggerMarketSync() {
+            const btn = document.getElementById('syncBtn');
+            btn.disabled = true;
+            btn.textContent = '⏳ Syncing with CardTrader...';
+            showStatus('Fetching real-time listings for all active cards from CardTrader API...', false);
+
+            try {
+                const res = await fetch('/api/v1/sync', { method: 'POST' });
+                const summary = await res.json();
+                showStatus(`Sync complete! Processed ${summary.totalCardsProcessed} cards (${summary.snapshotsSaved} snapshots saved).`, false);
+                await loadAnalytics();
+            } catch (err) {
+                showStatus('Error during market sync: ' + err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '⚡ Sync Market Prices Now';
+            }
+        }
+
+        async function addNewCard(event) {
+            event.preventDefault();
+            const blueprintId = Number(document.getElementById('inputBlueprintId').value);
+            const cardName = document.getElementById('inputCardName').value;
+
+            const res = await fetch('/api/v1/cards', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blueprintId, cardName })
+            });
+
+            if (res.ok) {
+                document.getElementById('inputBlueprintId').value = '';
+                document.getElementById('inputCardName').value = '';
+                showStatus(`Card "${cardName}" (#${blueprintId}) added to watchlist! Click "Sync Market Prices Now" to fetch its prices.`, false);
+            } else {
+                const problem = await res.json();
+                showStatus(problem.detail || 'Failed to add card', true);
+            }
+        }
+
+        function filterTable() {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allCardsData.filter(c =>
+                c.cardName.toLowerCase().includes(q) ||
+                (c.rarity && c.rarity.toLowerCase().includes(q)) ||
+                (c.expansionName && c.expansionName.toLowerCase().includes(q))
+            );
+            renderTable(filtered);
+        }
+
+        function showStatus(msg, isError) {
+            const box = document.getElementById('statusAlert');
+            box.className = `p-4 rounded-xl border text-sm ${isError ? 'bg-rose-950/60 border-rose-800 text-rose-200' : 'bg-indigo-950/60 border-indigo-800 text-indigo-200'}`;
+            box.textContent = msg;
+            box.classList.remove('hidden');
+        }
+
+        loadAnalytics();
+    </script>
+</body>
+</html>
